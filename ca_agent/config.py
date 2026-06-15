@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # LLM
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
