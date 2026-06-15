@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuberger Berman — Corporate Actions AI Agent</title>
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient-start: #0b0f19;
+            --bg-gradient-end: #1e1b4b;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.25);
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.1);
+            --alert: #ef4444;
+            --alert-bg: rgba(239, 68, 68, 0.1);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.1);
+            --info: #0ea5e9;
+            --info-bg: rgba(14, 165, 233, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --monospace: 'JetBrains Mono', monospace;
+            --sans: 'Outfit', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header Style */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-symbol {
+            font-size: 2rem;
+            filter: drop-shadow(0 0 10px var(--primary-glow));
+        }
+
+        .logo-text h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #f8fafc, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 500;
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        /* Grid Layout */
+        main {
+            display: grid;
+            grid-template-columns: 1.1fr 1.4fr;
+            gap: 2rem;
+            padding: 2rem;
+            flex-grow: 1;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards and Panels */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            height: fit-content;
+        }
+
+        .panel-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        .panel-title span {
+            color: var(--primary);
+        }
+
+        /* Inputs & Dropdowns */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        select, textarea {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            padding: 0.75rem;
+            font-family: var(--sans);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        textarea {
+            font-family: var(--monospace);
+            resize: vertical;
+            min-height: 250px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary);
+            color: var(--text-main);
+            border: none;
+            border-radius: 8px;
+            padding: 0.85rem 1.5rem;
+            font-weight: 600;
+            font-family: var(--sans);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn:disabled {
+            background: rgba(148, 163, 184, 0.3);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            color: var(--text-muted);
+        }
+
+        .btn-outline-danger {
+            background: transparent;
+            border: 1px solid var(--alert);
+            color: var(--alert);
+            box-shadow: none;
+        }
+
+        .btn-outline-danger:hover {
+            background: var(--alert-bg);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.15);
+        }
+
+        .btn-success {
+            background: var(--success);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Loading / Processing State indicator */
+        .status-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .status-val {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-val.processing { color: var(--info); }
+        .status-val.paused { color: var(--warning); }
+        .status-val.complete { color: var(--success); }
+        .status-val.error { color: var(--alert); }
+        .status-val.rejected { color: var(--alert); }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--info);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+
+        /* HITL Escalation panel */
+        .escalation-panel {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .escalation-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--warning);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .escalation-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .escalation-buttons button {
+            flex: 1;
+            padding: 0.65rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        /* Timeline / Audit Trail */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            padding-left: 2rem;
+            margin-top: 0.5rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .timeline-step {
+            position: relative;
+            margin-bottom: 2rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .timeline-step:last-child {
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-bullet {
+            position: absolute;
+            left: -2rem;
+            top: 4px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #334155;
+            border: 3px solid var(--bg-gradient-start);
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-bullet.completed {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .timeline-bullet.active {
+            background: var(--info);
+            box-shadow: 0 0 8px var(--info);
+            animation: activeBullet 1s infinite alternate;
+        }
+
+        .timeline-bullet.retry {
+            background: var(--warning);
+            box-shadow: 0 0 8px var(--warning);
+        }
+
+        @keyframes activeBullet {
+            from { transform: scale(1); }
+            to { transform: scale(1.25); }
+        }
+
+        .timeline-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .timeline-node-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            text-transform: capitalize;
+        }
+
+        .timeline-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--monospace);
+        }
+
+        .timeline-thought {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 0.75rem;
+            font-style: italic;
+            white-space: pre-line;
+        }
+
+        .timeline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .action-badge {
+            font-size: 0.75rem;
+            font-family: var(--monospace);
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .action-badge.retry-badge {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #fbd58d;
+        }
+
+        /* Final Report Pre format */
+        .report-content {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--monospace);
+            font-size: 0.8rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Helper Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .empty-icon {
+            font-size: 2.5rem;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <div class="logo-symbol">🏦</div>
+            <div class="logo-text">
+                <h1>Neuberger Berman</h1>
+                <p>Corporate Actions Processing Agent</p>
+            </div>
+        </div>
+        <div class="api-status">
+            <div class="status-dot"></div>
+            <span>Agent Engine Online</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Column: Input and Operations Control -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>⚙️</span> Operations Control Center
+            </div>
+
+            <!-- Preloaded Templates Dropdown -->
+            <div class="form-group">
+                <label for="template-select">Select Demo Scenario</label>
+                <select id="template-select">
+                    <option value="">-- Custom Input / Empty --</option>
+                    <option value="scenario1">Scenario 1: Mandatory Dividend (Straight-Through-Processing)</option>
+                    <option value="scenario2">Scenario 2: Voluntary Tender Offer (Pauses for PM Election)</option>
+                    <option value="scenario3">Scenario 3: Reconciliation Break (Triggers Self-Correction Retry)</option>
+                    <option value="scenario4">Scenario 4: Data Quality Error (Invalid ISIN Checksum)</option>
+                    <option value="scenario5">Scenario 5: Volkswagen Bond (Missing Security Master Fields)</option>
+                </select>
+            </div>
+
+            <!-- Swift Input Area -->
+            <div class="form-group">
+                <label for="swift-input">Raw Ingestion Feed (SWIFT MT564/MT566 or narrative)</label>
+                <textarea id="swift-input" placeholder="Paste SWIFT message here..."></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <button id="submit-btn" class="btn">
+                <span>▶</span> Execute Processing Pipeline
+            </button>
+
+            <!-- Agent status indicator -->
+            <div id="status-card" class="status-card" style="display: none;">
+                <div class="status-info">
+                    <label>Task Status</label>
+                    <div id="status-val" class="status-val">Processing</div>
+                </div>
+                <div id="status-spinner" class="spinner"></div>
+                <div id="status-pulse" class="pulse-dot" style="display: none;"></div>
+            </div>
+
+            <!-- Human In The Loop Gate Panel -->
+            <div id="escalation-panel" class="escalation-panel" style="display: none;">
+                <div class="escalation-title">
+                    <span>⚠️</span> Escalation Approval Requested (HITL Gate)
+                </div>
+                <div id="escalation-reason" style="font-size: 0.85rem; line-height: 1.4; color: #fef08a;">
+                    Voluntary tender offer election required.
+                </div>
+                <div class="escalation-buttons">
+                    <button id="approve-btn" class="btn btn-success">Approve Booking</button>
+                    <button id="reject-btn" class="btn btn-outline-danger">Reject Booking</button>
+                </div>
+            </div>
+
+            <!-- Output final report -->
+            <div id="report-card" class="form-group" style="display: none;">
+                <label>Final Processing Report</label>
+                <pre id="report-content" class="report-content"></pre>
+            </div>
+        </div>
+
+        <!-- Right Column: Real-Time Audit Trail -->
+        <div class="panel" style="max-height: 85vh; overflow-y: auto;">
+            <div class="panel-title">
+                <span>🕵️‍♂️</span> Cognitive Reasoning Audit Trail
+            </div>
+
+            <!-- Live audit list container -->
+            <div id="timeline" class="timeline">
+                <div class="empty-state" id="timeline-empty">
+                    <div class="empty-icon">🗂️</div>
+                    <p>No active task. Select a scenario and execute the pipeline to watch the agent's real-time reasoning and self-correction loops.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const templateSelect = document.getElementById('template-select');
+        const swiftInput = document.getElementById('swift-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const statusCard = document.getElementById('status-card');
+        const statusVal = document.getElementById('status-val');
+        const statusSpinner = document.getElementById('status-spinner');
+        const statusPulse = document.getElementById('status-pulse');
+        const escalationPanel = document.getElementById('escalation-panel');
+        const escalationReason = document.getElementById('escalation-reason');
+        const approveBtn = document.getElementById('approve-btn');
+        const rejectBtn = document.getElementById('reject-btn');
+        const reportCard = document.getElementById('report-card');
+        const reportContent = document.getElementById('report-content');
+        const timeline = document.getElementById('timeline');
+        const timelineEmpty = document.getElementById('timeline-empty');
+
+        let currentTaskId = null;
+        let pollInterval = null;
+        let templates = {};
+        let lastAuditLogJson = '';
+
+        // Fetch templates on load
+        async function loadTemplates() {
+            try {
+                const response = await fetch('/templates');
+                templates = await response.json();
+            } catch (e) {
+                console.error("Failed to load templates", e);
+            }
+        }
+        loadTemplates();
+
+        // Template Selection Handler
+        templateSelect.addEventListener('change', () => {
+            const val = templateSelect.value;
+            if (val && templates[val]) {
+                swiftInput.value = templates[val];
+            } else {
+                swiftInput.value = '';
+            }
+        });
+
+        // Submit button handler
+        submitBtn.addEventListener('click', async () => {
+            const raw_input = swiftInput.value.trim();
+            if (!raw_input) {
+                alert("Please select a scenario or input a raw corporate action feed.");
+                return;
+            }
+
+            // Reset UI State
+            currentTaskId = null;
+            clearInterval(pollInterval);
+            timeline.innerHTML = '';
+            reportCard.style.display = 'none';
+            escalationPanel.style.display = 'none';
+            timelineEmpty.style.display = 'none';
+            lastAuditLogJson = '';
+
+            submitBtn.disabled = true;
+            statusCard.style.display = 'flex';
+            setStatus('processing');
+
+            try {
+                const response = await fetch('/process-event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ raw_input, input_source: 'MT564' })
+                });
+                const data = await response.json();
+                currentTaskId = data.task_id;
+                
+                updateUIState(data);
+                
+                // Start polling
+                pollInterval = setInterval(pollTaskStatus, 1500);
+            } catch (e) {
+                console.error(e);
+                alert("Pipeline execution failed to start.");
+                submitBtn.disabled = false;
+                statusCard.style.display = 'none';
+            }
+        });
+
+        // Human Action Triggers
+        approveBtn.addEventListener('click', () => triggerHITL('approve'));
+        rejectBtn.addEventListener('click', () => triggerHITL('reject'));
+
+        async function triggerHITL(action) {
+            if (!currentTaskId) return;
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/task/${currentTaskId}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                // Clear buttons, reset status spinner
+                escalationPanel.style.display = 'none';
+                setStatus('processing');
+                lastAuditLogJson = '';
+                
+                // Immediate update and restart polling
+                updateUIState(data);
+                clearInterval(pollInterval);
+                pollInterval = setInterval(pollTaskStatus, 1500);
+            } catch (e) {
+                console.error(e);
+                alert(`Failed to submit human ${action}.`);
+            } finally {
+                approveBtn.disabled = false;
+                rejectBtn.disabled = false;
+            }
+        }
+
+        // Status Polling Loop
+        async function pollTaskStatus() {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`/task/${currentTaskId}`);
+                const data = await response.json();
+                
+                updateUIState(data);
+
+                if (data.status === 'complete' || data.status === 'rejected') {
+                    clearInterval(pollInterval);
+                    submitBtn.disabled = false;
+                }
+            } catch (e) {
+                console.error("Error polling task", e);
+            }
+        }
+
+        function setStatus(status) {
+            statusVal.className = 'status-val ' + status;
+            if (status === 'processing') {
+                statusVal.innerText = 'Agent Processing...';
+                statusSpinner.style.display = 'block';
+                statusPulse.style.display = 'none';
+            } else if (status === 'paused_for_approval') {
+                statusVal.innerText = 'Paused (Awaiting Human Approval)';
+                statusSpinner.style.display = 'none';
+                statusPulse.style.display = 'block';
+            } else if (status === 'complete') {
+                statusVal.innerText = 'Processing Complete';
+                statusSpinner.style.display = 'none';
+                statusPulse.style.display = 'none';
+            } else if (status === 'rejected') {
+                statusVal.innerText = 'Task Rejected';
+                statusSpinner.style.display = 'none';
+                statusPulse.style.display = 'none';
+            } else {
+                statusVal.innerText = status;
+                statusSpinner.style.display = 'none';
+                statusPulse.style.display = 'none';
+            }
+        }
+
+        // Render UI with latest polling data
+        function updateUIState(data) {
+            setStatus(data.status);
+
+            // Handle HITL Panel
+            if (data.status === 'paused_for_approval') {
+                escalationPanel.style.display = 'flex';
+                escalationReason.innerText = data.escalation_reason || "Verification break or voluntary PM action requires confirmation.";
+            } else {
+                escalationPanel.style.display = 'none';
+            }
+
+            // Render Final Report
+            if (data.final_report) {
+                reportCard.style.display = 'flex';
+                reportContent.innerText = data.final_report;
+            }
+
+            // Render Audit Trail Timeline only if the audit log has updated
+            if (data.audit_log && data.audit_log.length > 0) {
+                const currentLogJson = JSON.stringify(data.audit_log);
+                if (currentLogJson !== lastAuditLogJson) {
+                    lastAuditLogJson = currentLogJson;
+                    renderTimeline(data.audit_log, data.completed_nodes || []);
+                }
+            }
+        }
+
+        function renderTimeline(auditLog, completedNodes) {
+            timelineEmpty.style.display = 'none';
+            
+            // Loop through entries and build cards
+            let timelineHtml = '';
+            auditLog.forEach((entry, idx) => {
+                const nodeName = entry.node.replace('_node', '');
+                const timestamp = entry.timestamp;
+                const thought = entry.thought;
+                const actions = entry.actions || [];
+                
+                // Determine bullet state (completed vs. active vs. retry)
+                let bulletClass = 'completed';
+                if (idx === auditLog.length - 1) {
+                    bulletClass = 'active';
+                }
+                
+                let isRetry = false;
+                actions.forEach(act => {
+                    if (act.includes('retry') || act.includes('loop')) {
+                        isRetry = true;
+                    }
+                });
+                if (isRetry) {
+                    bulletClass = 'retry';
+                }
+
+                let actionBadges = '';
+                actions.forEach(act => {
+                    const isRet = act.includes('retry') || act.includes('loop');
+                    actionBadges += `<span class="action-badge ${isRet ? 'retry-badge' : ''}">${act}</span>`;
+                });
+
+                timelineHtml += `
+                    <div class="timeline-step">
+                        <div class="timeline-bullet ${bulletClass}"></div>
+                        <div class="timeline-card">
+                            <div class="timeline-header">
+                                <div class="timeline-node-name">${nodeName}</div>
+                                <div class="timeline-time">${timestamp}</div>
+                            </div>
+                            <div class="timeline-thought">${thought}</div>
+                            <div class="timeline-actions">
+                                ${actionBadges}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            timeline.innerHTML = timelineHtml;
+        }
+    </script>
+</body>
+</html>

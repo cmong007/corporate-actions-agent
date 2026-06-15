@@ -1,0 +1,7 @@
+isin,cusip,sedol,security_name,asset_class,exchange,currency,issuer_country,is_active
+US0378331005,037833100,2046251,Apple Inc,Equity,NASDAQ,USD,US,True
+GB0002634946,,B6K5LW3,BP plc,Equity,LSE,GBP,GB,True
+US5949181045,594918104,2588173,Microsoft Corp,Equity,NASDAQ,USD,US,True
+US912828YK08,912828YK0,,US Treasury 2.5% 2026,Fixed Income,OTC,USD,US,True
+XS2345678903,,,Volkswagen 1.875% 2028,,OTC,EUR,DE,True
+US4592001014,459200101,2005973,International Business Machines,Equity,NYSE,USD,US,True

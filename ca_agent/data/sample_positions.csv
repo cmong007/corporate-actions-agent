@@ -1,0 +1,11 @@
+portfolio_name,portfolio_id,isin,security_name,quantity,asset_class,base_currency
+Growth Fund,PF001,US0378331005,Apple Inc,100000,Equity,USD
+Income Fund,PF002,US0378331005,Apple Inc,70000,Equity,USD
+Balanced Fund,PF003,US0378331005,Apple Inc,30000,Equity,USD
+Growth Fund,PF001,GB0002634946,BP plc,75000,Equity,GBP
+Income Fund,PF002,GB0002634946,BP plc,40000,Equity,GBP
+Growth Fund,PF001,US5949181045,Microsoft Corp,35000,Equity,USD
+Balanced Fund,PF003,US5949181045,Microsoft Corp,18000,Equity,USD
+Fixed Income Fund,PF004,US912828YK08,US Treasury 2.5% 2026,1000000,Fixed Income,USD
+Fixed Income Fund,PF004,XS2345678903,Volkswagen 1.875% 2028,500000,Fixed Income,EUR
+Growth Fund,PF001,US4592001014,International Business Machines,22000,Equity,USD

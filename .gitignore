@@ -1,0 +1,23 @@
+# Environment variables
+.env
+**/.env
+ca_agent/.env
+
+# Python cache files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+ca_agent_checkpoints.db
+ca_agent_checkpoints.db-shm
+ca_agent_checkpoints.db-wal
+
+# Log files
+*.log
+scratch/
