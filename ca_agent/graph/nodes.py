@@ -499,10 +499,18 @@ Run Security Master validation now.
         if isinstance(tool_results["suggested_fixes"], list):
             fixes.extend(tool_results["suggested_fixes"])
 
+    critical_keywords = ["missing", "inactive", "not found", "invalid", "no exchange", "no asset class"]
+    escalation_reason = ""
+    if issues:
+        critical = [i for i in issues if any(kw in str(i).lower() for kw in critical_keywords)]
+        if critical:
+            escalation_reason = f"Security Master data quality issues found: {'; '.join(str(i) for i in critical[:3])}. Please confirm before distributing notification."
+
     return {
         **guard,
         "security_master_issues": issues,
         "suggested_fixes": fixes,
+        **({"escalation_reason": escalation_reason} if escalation_reason else {}),
         **{k: v for k, v in tool_results.items()
            if k not in ("issues", "suggested_fixes", "isin", "cusip", "sedol")}
     }
@@ -529,6 +537,17 @@ def checking_node(state: AgentState) -> dict:
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     issues_found = []
+
+    # Check for missing or placeholder mandatory fields
+    mandatory_fields = {
+        "isin": "ISIN",
+        "event_type": "Event Type",
+        "issuer": "Issuer",
+    }
+    for field_key, field_label in mandatory_fields.items():
+        val = str(state.get(field_key, "")).strip()
+        if not val or val.upper() in ("N/A", "UNKNOWN", "NONE"):
+            issues_found.append(f"Missing mandatory field: '{field_label}'")
 
     # Fields to check for raw SWIFT tag contamination
     fields_to_check = {
@@ -715,8 +734,11 @@ def _emit_escalation_alert(state: AgentState) -> None:
 
 def action_executor_node(state: AgentState) -> dict:
     """
-    Final step — generates the processing summary report.
-    In production: would write to Aladdin, send election instructions, etc.
+    Final step — generates the final document output for the operations team.
+    Depending on the event type and reconciliation status:
+    - Voluntary event: Generates a SWIFT MT565 Instruction Package
+    - Reconciliation break: Generates a Custodian Dispute Notice
+    - Standard clean mandatory event: Generates a Corporate Actions Notification Package
     """
     guard = _increment_and_check(state, "action_executor_node")
     if "error" in guard:
@@ -725,71 +747,248 @@ def action_executor_node(state: AgentState) -> dict:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     breaks = state.get("breaks", [])
     sm_issues = state.get("security_master_issues", [])
-    recon_report = state.get("generate_recon_report_result", "")
+    entitlements = state.get("projected_entitlements") or state.get("entitlements", [])
+    event_type = state.get("event_type", "N/A")
+    event_category = state.get("event_category", "mandatory")
+    recon_status = state.get("recon_status", "pending")
+    approval_status = state.get("approval_status", "")
 
-    report_lines = [
-        f"CORPORATE ACTIONS PROCESSING SUMMARY",
-        f"Generated: {timestamp}",
-        f"Task ID  : {state.get('task_id', 'N/A')}",
-        "=" * 60,
-        f"Event    : {state.get('event_type', 'N/A')} — {state.get('issuer', 'N/A')}",
-        f"ISIN     : {state.get('isin', 'N/A')}",
-        f"Category : {state.get('event_category', 'N/A')}",
-        f"Pay Date : {state.get('pay_date', 'N/A')}",
-        f"Currency : {state.get('currency', 'N/A')}",
-        "",
-        "ENTITLEMENTS",
-        "-" * 40,
-        f"Total Projected: {state.get('currency', '')} {state.get('total_projected', '0')}",
-        f"Portfolios     : {len(state.get('affected_portfolios', []))} affected",
-        "",
-        "RECONCILIATION",
-        "-" * 40,
-        f"Status: {state.get('recon_status', 'pending').upper()}",
-    ]
+    # Resolve pricing (use offer_price for TEND if available)
+    price_label = "Offer Price" if event_type == "TEND" else "Gross Rate"
+    price_val = state.get("offer_price") if event_type == "TEND" else state.get("gross_rate", "N/A")
+    if (not price_val or price_val == "0") and state.get("gross_rate"):
+        price_val = state.get("gross_rate")
 
-    if breaks:
-        report_lines.append(f"Breaks : {len(breaks)} exception(s) found")
+    has_unresolved_breaks = breaks and recon_status == "breaks_found"
+    has_data_issues = bool(sm_issues)
+    is_clean = not has_unresolved_breaks and not has_data_issues
+
+    # ── Custodian action line ────────────────────────────────────────────────
+    if event_type == "TEND":
+        custodian_action = (
+            f"Submit MT565 Election Instruction to custodian to tender holdings. "
+            f"Offer price: {state.get('currency', '')} {price_val} per share."
+        )
+    elif event_type == "DVCA":
+        custodian_action = (
+            f"Confirm cash credit on pay date {state.get('pay_date', 'N/A')}. "
+            f"Gross rate: {state.get('currency', '')} {price_val} per share."
+        )
+    elif event_type == "SPLF":
+        custodian_action = (
+            f"Confirm share credit on record date {state.get('record_date', 'N/A')}. "
+            f"Split ratio: {price_val}."
+        )
+    else:
+        custodian_action = f"Confirm settlement with custodian on {state.get('pay_date', 'N/A')}."
+
+    # ── CASE A: Voluntary Event (Tender/Elective) -> Generate SWIFT MT565 ─────
+    if event_category in ("voluntary", "elective") or event_type == "TEND":
+        notification_status = "INSTRUCTION GENERATED (Ready to Send)"
+        next_action = "Transmit the generated MT565 instruction above to the custodian bank."
+        
+        lines = [
+            "SWIFT MT565 - CORPORATE ACTION INSTRUCTION MESSAGE",
+            f"Generated   : {timestamp}",
+            f"Task ID     : {state.get('task_id', 'N/A')}",
+            f"Status      : {notification_status}",
+            "=" * 60,
+            "",
+            "SWIFT MESSAGE BLOCK 4",
+            "-" * 40,
+            ":16R:GENL",
+            f":20C::CORP//{event_type}-{state.get('issuer', 'N/A').split()[0].upper()}-{state.get('pay_date', '').replace('-', '')}",
+            f":20C::SEME//INST-{datetime.now(timezone.utc).strftime('%Y%m%d')}-001",
+            ":23G:NEWM",
+            f":22F::CAEV//{event_type}",
+            ":16S:GENL",
+            ":16R:USECU",
+            f":35B:ISIN {state.get('isin', 'N/A')}",
+            f"{state.get('issuer', 'N/A')}",
+            ":16S:USECU",
+            ":16R:CAOPTN",
+            ":13A::CAON//001",
+            ":22F::CAOP//TAKE",
+            ":16S:CAOPTN",
+            ":16R:ADDINFO",
+            f":70E::ADTX//ELECTION SUBMITTED BY PM. OPTION: TENDER HOLDINGS. PRICE: {state.get('currency', '')} {price_val}.",
+            ":16S:ADDINFO",
+            "-}",
+            "",
+            "INSTRUCTION SUMMARIES (per portfolio)",
+            "-" * 40,
+        ]
+        if entitlements:
+            for ent in entitlements:
+                pf = ent.get("portfolio_name", "Unknown")
+                pf_id = ent.get("portfolio_id", "")
+                qty = ent.get("quantity", "N/A")
+                ccy = ent.get("currency", state.get("currency", ""))
+                gross = ent.get("gross_entitlement", "0")
+                lines.append(
+                    f"  {pf} ({pf_id}) | {qty} shares elected | "
+                    f"Expected proceeds: {ccy} {gross}"
+                )
+        else:
+            lines.append("  No holdings to instruct.")
+
+    # ── CASE B: Reconciliation Mismatch -> Generate Custodian Dispute Alert ──
+    elif recon_status == "breaks_found":
+        notification_status = "DISPUTE DRAFTED (Awaiting Operations Dispatch)"
+        next_action = "Dispatch the dispute email notice below to the custodian bank's corporate actions team."
+
+        # Fetch actual Net amount confirmed
+        actual_net_confirm = "N/A"
         for b in breaks:
-            report_lines.append(
-                f"  ⚠️  {b['break_type']}: {b['currency']} {b['break_amount']} "
-                f"({b['break_pct']}%) — {b['likely_cause']}"
+            if b.get("break_type") == "NET":
+                actual_net_confirm = b.get("actual", "N/A")
+
+        lines = [
+            "CUSTODIAN RECONCILIATION DISPUTE NOTICE",
+            f"Generated   : {timestamp}",
+            f"Task ID     : {state.get('task_id', 'N/A')}",
+            f"Status      : {notification_status}",
+            "=" * 60,
+            "",
+            "DISPUTE MESSAGE SUMMARY",
+            "-" * 40,
+            f"To          : Custody Corporate Actions <custody.ca@bank.com>",
+            f"Subject     : DISPUTE: Cash Break on {state.get('issuer', 'N/A')} ({state.get('isin', 'N/A')})",
+            "",
+            "Dear Corporate Actions Team,",
+            "",
+            "We are disputing the cash payout confirmation (MT566) received for:",
+            f"  Issuer      : {state.get('issuer', 'N/A')}",
+            f"  ISIN        : {state.get('isin', 'N/A')}",
+            f"  Pay Date    : {state.get('pay_date', 'N/A')}",
+            "",
+            f"Our internal systems projected a net payout of {state.get('currency', '')} {state.get('total_projected', '0')}.",
+            f"Your MT566 confirmation states a net payout of {state.get('currency', '')} {actual_net_confirm}.",
+            "",
+            "Please review the discrepancy and apply the correct treaty withholding tax rate.",
+            "",
+            "Regards,",
+            "Operations Control Team",
+            "",
+            "RECONCILIATION EXCEPTION BREAKS",
+            "-" * 40,
+        ]
+        for b in breaks:
+            lines.append(
+                f"  ! {b.get('break_type','')}: {b.get('currency','')} {b.get('break_amount','')} "
+                f"({b.get('break_pct','')}%) - {b.get('likely_cause','')}"
             )
-    else:
-        report_lines.append("Breaks : ✅ None — fully reconciled")
 
-    report_lines += ["", "SECURITY MASTER", "-" * 40]
-    if sm_issues:
-        report_lines.append(f"Issues : {len(sm_issues)} data quality issue(s)")
-        for issue in sm_issues:
-            report_lines.append(f"  ⚠️  {issue}")
+    # ── CASE C: Mandatory Clean Event -> Generate Internal Notification Package ─
     else:
-        report_lines.append("Issues : ✅ No data quality issues")
+        if is_clean:
+            notification_status = "READY FOR DISTRIBUTION"
+            next_action = "Send the drafted notification below to internal stakeholders."
+        else:
+            notification_status = "PENDING REMEDIATION"
+            next_action = "Resolve exceptions below before distributing notification."
 
-    if state.get("approval_status") == "approved":
-        report_lines += [
-            "", "APPROVAL", "-" * 40,
-            f"✅ Approved by: {state.get('approved_by', 'Operations Team')}",
-            f"   At        : {state.get('approved_at', timestamp)}",
+        lines = [
+            "CORPORATE ACTIONS FINAL NOTIFICATION PACKAGE",
+            f"Generated : {timestamp}",
+            f"Task ID   : {state.get('task_id', 'N/A')}",
+            f"Status    : {notification_status}",
+            "=" * 60,
+            "",
+            "EVENT DETAILS",
+            "-" * 40,
+            f"Event Type : {event_type} ({event_category.upper()})",
+            f"Issuer     : {state.get('issuer', 'N/A')}",
+            f"ISIN       : {state.get('isin', 'N/A')}",
+            f"Ex-Date    : {state.get('ex_date', 'N/A')}",
+            f"Record Date: {state.get('record_date', 'N/A')}",
+            f"Pay Date   : {state.get('pay_date', 'N/A')}",
+            f"Currency   : {state.get('currency', 'N/A')}",
+            f"{price_label} : {price_val} per share",
+            "",
+            "CUSTODIAN ACTION",
+            "-" * 40,
+            custodian_action,
+            "",
+            "PORTFOLIO IMPACTS (per portfolio)",
+            "-" * 40,
         ]
 
-    report_lines += [
-        "", "NODES EXECUTED", "-" * 40,
-        " → ".join(state.get("completed_nodes", [])),
+        if entitlements:
+            for ent in entitlements:
+                pf = ent.get("portfolio_name", "Unknown")
+                pf_id = ent.get("portfolio_id", "")
+                qty = ent.get("quantity", "N/A")
+                etype = ent.get("type", "cash")
+
+                if etype in ("cash", "generic"):
+                    gross = ent.get("gross_entitlement", "0")
+                    wht = ent.get("withholding_tax", "0")
+                    net = ent.get("net_entitlement", gross)
+                    ccy = ent.get("currency", state.get("currency", ""))
+                    lines.append(
+                        f"  {pf} ({pf_id}) | {qty} shares | "
+                        f"Gross {ccy} {gross} | WHT {ccy} {wht} | Net {ccy} {net}"
+                    )
+                elif etype == "cash_tender":
+                    gross = ent.get("gross_entitlement", "0")
+                    ccy = ent.get("currency", state.get("currency", ""))
+                    lines.append(
+                        f"  {pf} ({pf_id}) | {qty} shares tendered | "
+                        f"Proceeds {ccy} {gross}"
+                    )
+                elif etype == "shares":
+                    new_shares = ent.get("new_shares", "N/A")
+                    lines.append(
+                        f"  {pf} ({pf_id}) | {qty} shares → {new_shares} shares post-split"
+                    )
+            lines.append(f"\n  Total Projected: {state.get('currency', '')} {state.get('total_projected', '0')}")
+        else:
+            lines.append("  No entitlement data available.")
+
+    # ── Reconciliation status ────────────────────────────────────────────────
+    if recon_status != "breaks_found":
+        lines += ["", "RECONCILIATION", "-" * 40]
+        if recon_status == "pending":
+            lines.append("Status : PENDING — MT566 confirmation not yet received from custodian.")
+        elif recon_status == "clean":
+            lines.append("Status : CONFIRMED CLEAN — Actual cash matches projected entitlements.")
+        else:
+            lines.append(f"Status : {recon_status.upper()}")
+
+    # ── Data quality notes ───────────────────────────────────────────────────
+    if sm_issues:
+        lines += ["", "DATA QUALITY NOTES", "-" * 40]
+        lines.append("Remediate the following before distributing notification:")
+        for issue in sm_issues:
+            lines.append(f"  ! {issue}")
+
+    # ── Approval record ──────────────────────────────────────────────────────
+    if approval_status == "approved":
+        lines += [
+            "", "APPROVAL RECORD", "-" * 40,
+            f"Approved by : {state.get('approved_by', 'Operations Team')}",
+            f"Approved at : {state.get('approved_at', timestamp)}",
+        ]
+
+    # ── Next action for ops analyst ──────────────────────────────────────────
+    lines += [
+        "",
         "=" * 60,
-        "Processing complete.",
+        f"NEXT ACTION: {next_action}",
+        "=" * 60,
     ]
 
     log_entry = {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "node": "action_executor_node",
-        "thought": "• Generating final processing summary report.",
-        "actions": ["generate_final_report"]
+        "thought": f"• Final reports generated. Status: {notification_status}. {len(entitlements)} portfolio actions completed.",
+        "actions": ["generate_final_package"]
     }
 
     return {
         **guard,
-        "final_report": "\n".join(report_lines),
+        "final_report": "\n".join(lines),
         "audit_log": [log_entry]
     }
 

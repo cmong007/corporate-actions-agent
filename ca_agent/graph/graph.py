@@ -109,6 +109,7 @@ def build_graph():
         route_after_security_master,
         {
             "action_executor_node": "action_executor_node",
+            "escalation_gate_node": "escalation_gate_node",
             "error_node":           "error_node",
         }
     )

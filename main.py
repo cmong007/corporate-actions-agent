@@ -92,6 +92,8 @@ def get_task(task_id: str):
                 "error": "",
                 "audit_log": [],
                 "escalation_reason": "",
+                "parse_success": True,
+                "event_category": "mandatory",
             }
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
@@ -110,6 +112,8 @@ def get_task(task_id: str):
                 "error": "",
                 "audit_log": [],
                 "escalation_reason": "",
+                "parse_success": True,
+                "event_category": "mandatory",
             }
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
@@ -137,6 +141,12 @@ def get_task(task_id: str):
         if not audit_log or audit_log[-1].get("node") != active_entry.get("node"):
             audit_log.append(active_entry)
 
+    # Determine parse success state
+    has_parse_errors = bool(state.values.get("parse_errors", []))
+    parse_success = state.values.get("parse_success", True)
+    if has_parse_errors:
+        parse_success = False
+
     return {
         "task_id": task_id,
         "status": status,
@@ -150,6 +160,8 @@ def get_task(task_id: str):
         "error": state.values.get("error", ""),
         "audit_log": audit_log,
         "escalation_reason": state.values.get("escalation_reason", ""),
+        "parse_success": parse_success,
+        "event_category": state.values.get("event_category", "mandatory"),
     }
 
 
@@ -254,7 +266,7 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def get_index():
     import os
-    template_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
+    template_path = os.path.join(os.path.dirname(__file__), "ca_agent", "templates", "index.html")
     with open(template_path, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -263,7 +275,7 @@ def get_index():
 def get_templates():
     import os
     templates = {}
-    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "ca_agent", "data")
     
     try:
         s1 = open(os.path.join(data_dir, "sample_mt564_dividend.txt")).read() + "\n\n--- MT566 CONFIRMATION ---\n\n" + open(os.path.join(data_dir, "sample_mt566_clean.txt")).read()
@@ -278,30 +290,8 @@ def get_templates():
     except Exception:
         s3 = ""
         
-    s4 = """{1:F01CITIUS33AXXX0000000000}{4:
-:22F::CAEV//DVCA
-:22F::CAMV//MAND
-:35B:ISIN US0378331006
-Apple Inc (INVALID CHECKSUM)
-:92A::GRSS//0.25
-:22F::CURR//USD
-:98A::PAYD//20260710
--}"""
-
-    s5 = """:22F::CAEV//DVCA
-:22F::CAMV//MAND
-:35B:ISIN XS2345678903
-Volkswagen 1.875% 2028
-:92A::GRSS//18.75
-:22F::CURR//EUR
-:98A::PAYD//20260715
-:98A::RDDT//20260710
-:98A::EXDT//20260709"""
-
     return {
         "scenario1": s1,
         "scenario2": s2,
         "scenario3": s3,
-        "scenario4": s4,
-        "scenario5": s5,
     }

@@ -528,11 +528,9 @@
                 <label for="template-select">Select Demo Scenario</label>
                 <select id="template-select">
                     <option value="">-- Custom Input / Empty --</option>
-                    <option value="scenario1">Scenario 1: Mandatory Dividend (Straight-Through-Processing)</option>
-                    <option value="scenario2">Scenario 2: Voluntary Tender Offer (Pauses for PM Election)</option>
-                    <option value="scenario3">Scenario 3: Reconciliation Break (Triggers Self-Correction Retry)</option>
-                    <option value="scenario4">Scenario 4: Data Quality Error (Invalid ISIN Checksum)</option>
-                    <option value="scenario5">Scenario 5: Volkswagen Bond (Missing Security Master Fields)</option>
+                    <option value="scenario1">Scenario 1: Mandatory Cash Dividend (Fully Automated STP)</option>
+                    <option value="scenario2">Scenario 2: Voluntary Tender Offer (Requires Human Approval)</option>
+                    <option value="scenario3">Scenario 3: Reconciliation Break (Escalates on Discrepancy)</option>
                 </select>
             </div>
 
@@ -566,14 +564,13 @@
                     Voluntary tender offer election required.
                 </div>
                 <div class="escalation-buttons">
-                    <button id="approve-btn" class="btn btn-success">Approve Booking</button>
-                    <button id="reject-btn" class="btn btn-outline-danger">Reject Booking</button>
+                    <button id="approve-btn" class="btn btn-success">Approve Distribution</button>
+                    <button id="reject-btn" class="btn btn-outline-danger">Reject Distribution</button>
                 </div>
             </div>
 
-            <!-- Output final report -->
             <div id="report-card" class="form-group" style="display: none;">
-                <label>Final Processing Report</label>
+                <label>Final Notification Package (Ready for Distribution)</label>
                 <pre id="report-content" class="report-content"></pre>
             </div>
         </div>
@@ -763,7 +760,34 @@
             // Handle HITL Panel
             if (data.status === 'paused_for_approval') {
                 escalationPanel.style.display = 'flex';
-                escalationReason.innerText = data.escalation_reason || "Verification break or voluntary PM action requires confirmation.";
+                
+                // Show approveBtn by default
+                approveBtn.style.display = 'inline-block';
+                
+                if (data.parse_success === false) {
+                    escalationReason.innerText = data.escalation_reason || "Critical Parsing Failure: The input feed could not be parsed as a valid corporate action message.";
+                    approveBtn.style.display = 'none';
+                    rejectBtn.innerText = "Abort Task & Resubmit";
+                    rejectBtn.className = "btn btn-danger";
+                } else if (data.event_category === 'voluntary') {
+                    escalationReason.innerText = data.escalation_reason || "Voluntary election decision required for this corporate action.";
+                    approveBtn.innerText = "Submit Election (Send MT565)";
+                    approveBtn.className = "btn btn-success";
+                    rejectBtn.innerText = "Decline Participation";
+                    rejectBtn.className = "btn btn-outline-danger";
+                } else if (data.recon_status === 'breaks_found') {
+                    escalationReason.innerText = data.escalation_reason || "Reconciliation Break: Mismatch detected between custody confirmation and projected amounts.";
+                    approveBtn.innerText = "Generate Custodian Dispute Alert";
+                    approveBtn.className = "btn btn-warning";
+                    rejectBtn.innerText = "Reject & Force Manual Review";
+                    rejectBtn.className = "btn btn-outline-danger";
+                } else {
+                    escalationReason.innerText = data.escalation_reason || "Verification break or voluntary PM action requires confirmation.";
+                    approveBtn.innerText = "Approve Distribution";
+                    approveBtn.className = "btn btn-success";
+                    rejectBtn.innerText = "Reject Distribution";
+                    rejectBtn.className = "btn btn-outline-danger";
+                }
             } else {
                 escalationPanel.style.display = 'none';
             }

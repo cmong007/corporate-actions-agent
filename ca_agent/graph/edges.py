@@ -124,9 +124,24 @@ def route_after_escalation(state: AgentState) -> str:
 
 
 def route_after_security_master(state: AgentState) -> str:
-    """After Security Master check — proceed to final execution."""
+    """After Security Master check — escalate critical issues or proceed to final execution."""
 
     if state.get("iteration_count", 0) >= MAX_ITERATIONS:
         return "error_node"
 
+    issues = state.get("security_master_issues", [])
+    approval_status = state.get("approval_status", "")
+
+    # Critical issues that should block booking: missing asset class, inactive security,
+    # or missing exchange. Surface to HITL for analyst to confirm before booking.
+    if issues and approval_status != "approved":
+        critical_keywords = ["missing", "inactive", "not found", "invalid", "no exchange", "no asset class"]
+        has_critical = any(
+            any(kw in str(issue).lower() for kw in critical_keywords)
+            for issue in issues
+        )
+        if has_critical:
+            return "escalation_gate_node"
+
     return "action_executor_node"
+

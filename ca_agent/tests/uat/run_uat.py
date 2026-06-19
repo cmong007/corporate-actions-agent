@@ -38,7 +38,7 @@ def print_banner(scenario_num: int, scenario: dict):
     print(f"{scenario['description']}")
     print(f"\n{BOLD}JD Mapping:{RESET}")
     for item in scenario.get("jd_mapping", []):
-        print(f"  • {item}")
+        print(f"  * {item}")
     print(f"\n{BOLD}Expected Route:{RESET} {' -> '.join(scenario.get('expected_route', []))}")
     print("-" * 65)
 
@@ -74,7 +74,7 @@ def run_scenario(scenario_num: int, scenario: dict, verbose: bool = False) -> di
         "duration_s": 0,
     }
 
-    print(f"▶  Running agent... (task_id: {task_id[:8]}...)")
+    print(f"[RUN] Running agent... (task_id: {task_id[:8]}...)")
 
     try:
         # ── Run the graph ─────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ def run_scenario(scenario_num: int, scenario: dict, verbose: bool = False) -> di
 
         # ── Scenario 2: Simulate HITL approval ───────────────────────────────
         if scenario_num == 2 and is_paused:
-            print(f"\n{YELLOW}⏸  Agent paused for HITL approval (as expected){RESET}")
+            print(f"\n{YELLOW}[PAUSE] Agent paused for HITL approval (as expected){RESET}")
             print(f"   Simulating: POST /task/{task_id[:8]}.../approve")
             time.sleep(0.5)  # Simulate human review time
 
@@ -107,7 +107,7 @@ def run_scenario(scenario_num: int, scenario: dict, verbose: bool = False) -> di
             final_state = graph.invoke(None, config=config)
             results["state"] = final_state
             results["is_paused"] = False
-            print(f"{GREEN}✅ Approval simulated — graph resumed{RESET}")
+            print(f"{GREEN}[OK] Approval simulated - graph resumed{RESET}")
 
         # ── Evaluate pass criteria ────────────────────────────────────────────
         _evaluate_criteria(scenario, final_state, is_paused, results)
@@ -120,14 +120,14 @@ def run_scenario(scenario_num: int, scenario: dict, verbose: bool = False) -> di
 
     results["duration_s"] = round(time.time() - start_time, 2)
 
-    # ── Print results ─────────────────────────────────────────────────────────
+    # -- Print results ---------------------------------------------------------
     print(f"\n{BOLD}Results:{RESET}")
     for p in results["passed"]:
-        print(f"  {GREEN}✅ PASS{RESET}: {p}")
+        print(f"  {GREEN}[OK] PASS{RESET}: {p}")
     for f in results["failed"]:
-        print(f"  {RED}❌ FAIL{RESET}: {f}")
+        print(f"  {RED}[FAIL] FAIL{RESET}: {f}")
     for w in results["warnings"]:
-        print(f"  {YELLOW}⚠️  WARN{RESET}: {w}")
+        print(f"  {YELLOW}[WARN] WARN{RESET}: {w}")
 
     status_colour = GREEN if not results["failed"] else RED
     status_label  = "PASSED" if not results["failed"] else "FAILED"
@@ -251,7 +251,7 @@ def main():
     all_results = []
 
     print(f"\n{BOLD}{'='*65}")
-    print(f"  CORPORATE ACTIONS AGENT — USER ACCEPTANCE TESTING")
+    print(f"  CORPORATE ACTIONS AGENT - USER ACCEPTANCE TESTING")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*65}{RESET}")
 
@@ -274,7 +274,7 @@ def main():
         print(f"{'='*65}")
         for r in all_results:
             status = f"{GREEN}PASS{RESET}" if not r["failed"] else f"{RED}FAIL{RESET}"
-            print(f"  Scenario {r['scenario']}: {status} — {r['name']}")
+            print(f"  Scenario {r['scenario']}: {status} - {r['name']}")
 
         status_colour = GREEN if failed == 0 else RED
         print(f"\n{BOLD}{status_colour}"
